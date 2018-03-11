@@ -1,5 +1,6 @@
 // pull in our models. This will automatically load the index.js from that folder
 const models = require('../models');
+const handlebars = require('handlebars');
 
 // get the Cat model
 const Cat = models.Cat.CatModel;
@@ -12,8 +13,16 @@ const defaultData = {
   bedsOwned: 0,
 };
 
+const defaultDogData = {
+  name: 'ren',
+  breed: 'geki',
+  age: 7,
+};
+
 // object for us to keep track of the last Cat we made and dynamically update it sometimes
 let lastAdded = new Cat(defaultData);
+
+let findDog = new Dog(defaultDogData);
 
 // function to handle requests to the main page
 // controller functions in Express receive the full HTTP request
@@ -44,10 +53,6 @@ const readAllCats = (req, res, callback) => {
   // The find function returns an array of matching objects
   Cat.find(callback);
 };
-
-// const readAllDogs = (req, res, callback) => {
-//  Dog.find(callback);
-// };
 
 
 // function to find a specific cat on request.
@@ -119,25 +124,28 @@ const hostPage3 = (req, res) => {
 };
 
 const hostPage4 = (req, res) => {
-  // const callback = (err, doc) => {
-  //  if (err) {
-  //    return res.json({ err });
-  //  }
-  //  return res.json(doc);
-  // };
-  //
-  // // const dogs = readAllDogs(callback);
-  // Handlebars.registerHelper('list', (dogs, options) => {
-  //  let out = '<ul>';
-  //
-  //  for (let i = 0, l = dogs.length; i < l; i++) {
-  //    out = `${out}<li>${options.fn(dogs[i])}</li>`;
-  //  }
-  //
-  //  return `${out}</ul>`;
-  // });
+  const callback = (err, doc) => {
+   if (err) {
+     return res.json({ err });
+   }
+   return doc;
+  };
+  
+  const dogList = Dog.find(callback);
+  handlebars.registerHelper('list', (dogs) => {
+   let out = '<ul>';
+   
+   for (let i = 0; i < dogs.length; i++) {
+     out = `${out}<li>${dogs[i]}</li>`;
+	 console.log(dogs[i]);
+   }
+  
+   return `${out}</ul>`;
+  });
 
-  res.render('page4');
+  res.render('page4', {
+    dogs: dogList,
+  });
 };
 
 // function to handle get request to send the name
@@ -220,25 +228,26 @@ const updateDogAge = (req, res) => {
     return res.status(400).json({ error: 'name and new age are required' });
   }
 
-  const aDog = Dog.findByName(req.body.name, (err, doc) => {
+  return Dog.findByName(req.body.name, (err, doc) => {
     if (err) {
       return res.json({ err });
     }
     if (!doc) {
       return res.json({ error: 'no dog of such name was found' });
     }
-    return res.json({ name: doc.name, breed: doc.breed, age: doc.age });
+    // return Dog({ name: doc.name, breed: doc.breed, age: doc.age });
+
+    findDog = doc;
+    findDog.age = req.body.newAge;
+
+    const savePromise = findDog.save();
+
+    savePromise.then(() => {
+      res.json({ name: findDog.name, age: findDog.age });
+    }).catch(errr => res.json({ errr }));
+
+    return res;
   });
-
-  aDog.age = req.body.newAge;
-
-  const savePromise = aDog.save();
-
-  savePromise.then(() => {
-    res.json({ name: aDog.name, age: aDog.age });
-  }).catch(err => res.json({ err }));
-
-  return res;
 };
 
 // function to handle requests search for a name and return the object
